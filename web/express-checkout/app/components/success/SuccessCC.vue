@@ -4,7 +4,9 @@
  * Renders the checkmark, amount summary, and the Download Receipt button.
  *
  * Download goes through pay-api's /payment-requests/{id}/receipts POST
- * (returns a Blob) — same call auth-web's makepayment page uses.
+ * (returns a Blob) — same call auth-web's makepayment page uses. A guest payer
+ * has no session for that route, so they go through the payment-link token
+ * instead; same split as the return page's invoice refresh.
  */
 const props = defineProps<{
   invoiceId?: number
@@ -14,6 +16,7 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const payLink = usePayLink()
+const store = usePaymentLinkStore()
 
 const downloading = ref(false)
 const downloadError = ref<string | null>(null)
@@ -24,7 +27,14 @@ async function download() {
   downloadError.value = null
   try {
     const filingDateTime = formatFilingDateTime(props.invoiceCreatedOn) || formatFilingDateTime(new Date())
-    const blob = await payLink.downloadReceipt(props.invoiceId, filingDateTime)
+    let blob: Blob
+    if (store.selectedAccountId) {
+      blob = await payLink.downloadReceipt(props.invoiceId, filingDateTime)
+    } else if (store.token) {
+      blob = await payLink.downloadReceiptByToken(store.token, filingDateTime)
+    } else {
+      throw new Error('No account or payment-link token found.')
+    }
     fileDownload(blob, `bcregistry-receipt-${props.invoiceId}.pdf`)
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } }
