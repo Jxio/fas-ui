@@ -153,6 +153,25 @@ export function usePayLink() {
   }
 
   /**
+   * POST /payment-links/{token}/receipts — same receipt PDF, keyed on the token.
+   *
+   * A guest who paid by card has no session, so downloadReceipt above would 401 and the
+   * link is their only route to a receipt — no account, no email. pay-api resolves the
+   * token to the invoice and only issues a receipt once it's paid.
+   */
+  async function downloadReceiptByToken(token: string, filingDateTime: string): Promise<Blob> {
+    return await ($payApi as ReturnType<typeof $fetch.create>)<Blob>(
+      `/payment-links/${token}/receipts`,
+      {
+        method: 'POST',
+        headers: { Accept: 'application/pdf' },
+        body: { filingDateTime, isRefund: false },
+        responseType: 'blob'
+      }
+    )
+  }
+
+  /**
    * POST /payment-requests/{invoiceId}/reports — pre-payment invoice PDF.
    * Same call sbc-auth's `payment.services.ts:downloadOBInvoice` makes: empty
    * body, requests application/pdf. Use for the OB "Download Invoice" button
@@ -179,6 +198,7 @@ export function usePayLink() {
     updateTransaction,
     changePaymentMethod,
     downloadReceipt,
+    downloadReceiptByToken,
     downloadInvoice
   }
 }
